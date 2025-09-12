@@ -21,7 +21,5 @@ export const updateTodos = ({
   completed,
   userId = USER_ID,
 }: Todo) => {
-  console.log('POST');
-
   return client.patch<Todo>(`/todos/${id}`, { title, completed, userId });
 };

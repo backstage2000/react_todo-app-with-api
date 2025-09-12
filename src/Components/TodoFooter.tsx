@@ -3,7 +3,9 @@ import { StatusFilter, Todo } from '../types/Todo';
 import cn from 'classnames';
 
 type Props = {
-  setStatusFilter: (value: 'all' | 'active' | 'completed') => void;
+  setStatusFilter: (
+    value: StatusFilter.All | StatusFilter.Active | StatusFilter.Completed,
+  ) => void;
   todos: Todo[];
   handleClearCompleted: () => void;
 };
@@ -13,7 +15,7 @@ export const TodoFooter: React.FC<Props> = ({
   todos,
   handleClearCompleted,
 }) => {
-  const [status, setStatus] = useState<StatusFilter>('all');
+  const [status, setStatus] = useState<StatusFilter>(StatusFilter.All);
   const someCompletedTodos = todos.some(todo => todo.completed === true);
 
   const handleStatusChange = (e: StatusFilter) => {
@@ -23,10 +25,9 @@ export const TodoFooter: React.FC<Props> = ({
 
   return (
     <>
-      {todos.length > 0 && (
+      {!!todos.length && (
         <footer className="todoapp__footer" data-cy="Footer">
           <span className="todo-count" data-cy="TodosCounter">
-            {/* {todos} items left */}
             {todos.filter(todo => !todo.completed).length} items left
           </span>
 
@@ -35,10 +36,10 @@ export const TodoFooter: React.FC<Props> = ({
             <a
               href="#/"
               className={cn('filter__link', {
-                selected: status === 'all',
+                selected: status === StatusFilter.All,
               })}
               data-cy="FilterLinkAll"
-              onClick={() => handleStatusChange('all')}
+              onClick={() => handleStatusChange(StatusFilter.All)}
             >
               All
             </a>
@@ -46,10 +47,10 @@ export const TodoFooter: React.FC<Props> = ({
             <a
               href="#/active"
               className={cn('filter__link', {
-                selected: status === 'active',
+                selected: status === StatusFilter.Active,
               })}
               data-cy="FilterLinkActive"
-              onClick={() => handleStatusChange('active')}
+              onClick={() => handleStatusChange(StatusFilter.Active)}
             >
               Active
             </a>
@@ -57,10 +58,10 @@ export const TodoFooter: React.FC<Props> = ({
             <a
               href="#/completed"
               className={cn('filter__link', {
-                selected: status === 'completed',
+                selected: status === StatusFilter.Completed,
               })}
               data-cy="FilterLinkCompleted"
-              onClick={() => handleStatusChange('completed')}
+              onClick={() => handleStatusChange(StatusFilter.Completed)}
             >
               Completed
             </a>

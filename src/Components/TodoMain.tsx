@@ -1,5 +1,5 @@
 import cn from 'classnames';
-import { Todo } from '../types/Todo';
+import { MessageError, Todo } from '../types/Todo';
 import React, { useState } from 'react';
 import '../styles/animation.scss';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
@@ -7,13 +7,21 @@ import { TransitionGroup, CSSTransition } from 'react-transition-group';
 type Props = {
   visibleTodos: Todo[];
   tempTodo: Todo | null;
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => Promise<void>;
   deletingIds: Set<number>;
-  updateTodos: (todo: Todo) => void;
+  updateTodos: (todo: Todo) => Promise<void>;
+  setErrorMessege: (message: string) => void;
 };
 
 export const TodoMain: React.FC<Props> = React.memo(
-  ({ visibleTodos, tempTodo, onDelete, deletingIds, updateTodos }) => {
+  ({
+    visibleTodos,
+    tempTodo,
+    onDelete,
+    deletingIds,
+    updateTodos,
+    setErrorMessege,
+  }) => {
     const [activeTodoId, setActiveTodoId] = useState<number | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [oldTodo, setOldTodo] = useState<Todo | undefined>(undefined);
@@ -23,7 +31,14 @@ export const TodoMain: React.FC<Props> = React.memo(
       setTitle(event.target.value);
     };
 
-    const handleSubmit = (e?: React.FormEvent | null) => {
+    const handleChangeCompleted = (todo: Todo) => {
+      updateTodos({
+        ...todo,
+        completed: !todo.completed,
+      });
+    };
+
+    const handleSubmit = async (e?: React.FormEvent | null) => {
       e?.preventDefault();
 
       const value = title.trim();
@@ -33,15 +48,34 @@ export const TodoMain: React.FC<Props> = React.memo(
       }
 
       if (value === '') {
-        onDelete(oldTodo.id);
-      } else if (oldTodo.title !== value) {
-        updateTodos({
-          ...oldTodo,
-          title: value,
-        });
+        try {
+          await onDelete(oldTodo.id);
+        } catch (error) {
+          setIsEditing(true);
+          setErrorMessege(MessageError.delete);
+
+          throw error;
+        }
+
+        return;
       }
 
-      setIsEditing(false);
+      if (oldTodo.title === value) {
+        setIsEditing(false);
+
+        return;
+      }
+
+      if (oldTodo.title !== value) {
+        try {
+          await updateTodos({ ...oldTodo, title: value });
+          setIsEditing(false);
+          setErrorMessege('');
+        } catch (error) {
+          setIsEditing(true);
+          setErrorMessege(MessageError.update);
+        }
+      }
     };
 
     return (
@@ -67,6 +101,7 @@ export const TodoMain: React.FC<Props> = React.memo(
                     data-cy="TodoStatus"
                     type="checkbox"
                     className="todo__status"
+                    onClick={() => handleChangeCompleted(todo)}
                     checked={todo.completed}
                   />
                   {}
@@ -83,15 +118,15 @@ export const TodoMain: React.FC<Props> = React.memo(
                       autoFocus
                       value={title}
                       onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          handleSubmit();
-                        }
-
                         if (e.key === 'Escape') {
                           setIsEditing(false);
                         }
                       }}
-                      onBlur={handleSubmit}
+                      onBlur={() => {
+                        if (isEditing) {
+                          handleSubmit();
+                        }
+                      }}
                     />
 
                     {deletingIds.has(todo.id) && (

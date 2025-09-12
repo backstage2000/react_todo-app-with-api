@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StatusFilter, Todo } from '../types/Todo';
+import { MessageError, StatusFilter, Todo } from '../types/Todo';
 
 import * as todoService from '../api/todos';
 import { TodoHeader } from './TodoHeader';
@@ -10,8 +10,9 @@ import { ErrorNotification } from './ErrorNotification/ErrorNotification';
 export const TodoApp: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [errorMessege, setErrorMessege] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    StatusFilter.All,
+  );
 
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
@@ -29,31 +30,19 @@ export const TodoApp: React.FC = () => {
       .getTodos()
       .then(loadingTodos => {
         setTodos(loadingTodos);
-        setLoading(true);
+
         focusInput.current?.();
       })
       .catch(() => {
         setErrorMessege('Unable to load todos');
-      })
-      .finally(() => setLoading(false));
+      });
   }, []);
-
-  function toggleAll() {
-    const allCompleted = todos.every(todo => todo.completed);
-
-    setTodos(currentTodos => {
-      return currentTodos.map(todo => ({
-        ...todo,
-        completed: !allCompleted,
-      }));
-    });
-  }
 
   const visibleTodos = todos.filter(todo => {
     return (
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && !todo.completed) ||
-      (statusFilter === 'completed' && todo.completed)
+      statusFilter === StatusFilter.All ||
+      (statusFilter === StatusFilter.Active && !todo.completed) ||
+      (statusFilter === StatusFilter.Completed && todo.completed)
     );
   });
 
@@ -62,7 +51,6 @@ export const TodoApp: React.FC = () => {
     completed,
     userId,
   }: Omit<Todo, 'id'>): Promise<void> {
-    setLoading(true);
     setErrorMessege('');
 
     const newTemptodo: Todo = {
@@ -84,20 +72,18 @@ export const TodoApp: React.FC = () => {
       })
       .catch(error => {
         setTempTodo(null);
-        setErrorMessege('Unable to add a todo');
+        setErrorMessege(MessageError.add);
 
         throw error;
       })
-      .finally(() => {
-        setLoading(false);
-      });
+      .finally(() => {});
   }
 
   function deleteTodos(id: number) {
     setErrorMessege('');
     setDeletingIds(prev => new Set(prev).add(id));
 
-    todoService
+    return todoService
       .deleteTodos(id)
       .then(() => {
         setTodos(todos.filter(todo => todo.id !== id));
@@ -105,7 +91,7 @@ export const TodoApp: React.FC = () => {
         focusInput.current?.();
       })
       .catch(error => {
-        setErrorMessege('Unable to delete a todo');
+        setErrorMessege(MessageError.delete);
         focusInput.current?.();
 
         throw error;
@@ -122,6 +108,7 @@ export const TodoApp: React.FC = () => {
   }
 
   function updateTodos(updateTodo: Todo) {
+    setErrorMessege('');
     setDeletingIds(prev => new Set(prev).add(updateTodo.id));
 
     return todoService
@@ -136,6 +123,11 @@ export const TodoApp: React.FC = () => {
           return newTodo;
         });
       })
+      .catch(error => {
+        setErrorMessege(MessageError.update);
+
+        throw error;
+      })
       .finally(() => {
         setDeletingIds(prev => {
           const next = new Set(prev);
@@ -145,6 +137,34 @@ export const TodoApp: React.FC = () => {
           return next;
         });
       });
+  }
+
+  async function toggleAll() {
+    const allCompleted = todos.every(todo => todo.completed);
+
+    const updates = todos.map(todo => ({
+      ...todo,
+      completed: !allCompleted,
+    }));
+
+    try {
+      await Promise.all(
+        updates
+          .filter((t, i) => {
+            return t.completed !== todos[i].completed;
+          })
+          .map(t =>
+            updateTodos(t).catch(error => {
+              setErrorMessege(MessageError.update);
+              throw error;
+            }),
+          ),
+      );
+
+      setTodos(updates);
+    } catch {
+      setErrorMessege(MessageError.update);
+    }
   }
 
   async function handleClearCompleted() {
@@ -180,14 +200,14 @@ export const TodoApp: React.FC = () => {
       focusInput.current?.();
 
       if (failedIds.length) {
-        setErrorMessege('Unable to delete a todo');
+        setErrorMessege(MessageError.delete);
       } else {
         setErrorMessege('');
       }
 
       setDeletingIds(new Set());
     } catch (err) {
-      setErrorMessege('Something went wrong');
+      setErrorMessege(MessageError.SomethingWentWrong);
       focusInput.current?.();
       setDeletingIds(new Set());
     }
@@ -216,6 +236,7 @@ export const TodoApp: React.FC = () => {
             setErrorMessege={setErrorMessege}
             focusInputFn={focusInputFn}
             toggleAll={toggleAll}
+            updateTodos={updateTodos}
           />
           {todos && (
             <TodoMain
@@ -224,6 +245,7 @@ export const TodoApp: React.FC = () => {
               onDelete={deleteTodos}
               deletingIds={deletingIds}
               updateTodos={updateTodos}
+              setErrorMessege={setErrorMessege}
             />
           )}
           {todos && (

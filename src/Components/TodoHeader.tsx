@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Todo } from '../types/Todo';
+import { MessageError, Todo } from '../types/Todo';
 import cn from 'classnames';
 import { USER_ID } from '../api/todos';
 
@@ -9,6 +9,7 @@ type Props = {
   setErrorMessege: (messege: string) => void;
   focusInputFn: (fn: () => void) => void;
   toggleAll: () => void;
+  updateTodos: (todo: Todo) => void;
 };
 
 export const TodoHeader: React.FC<Props> = ({
@@ -19,8 +20,7 @@ export const TodoHeader: React.FC<Props> = ({
   toggleAll,
 }) => {
   const [titleTodo, setTitleTodo] = useState('');
-  const [hasTitleError, setHasTitleError] = useState('');
-  const [completed, setCompleted] = useState(false);
+
   const [isSubmiting, setIsSubmiting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [justAdded, setJustAdded] = useState(false);
@@ -40,26 +40,21 @@ export const TodoHeader: React.FC<Props> = ({
 
   const handleTitleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setTitleTodo(event.target.value);
-    setHasTitleError('');
   };
-
-  // const handleAllCompleted = () => {};
 
   const reset = () => {
     setTitleTodo('');
-    setHasTitleError('');
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    setHasTitleError('');
+
     setErrorMessege('');
 
     const title = titleTodo.trim();
 
     if (!title) {
-      setHasTitleError('Title should not be empty');
-      setErrorMessege('Title should not be empty');
+      setErrorMessege(MessageError.title);
 
       return;
     }
@@ -68,18 +63,16 @@ export const TodoHeader: React.FC<Props> = ({
 
     onSubmit({
       title,
-      completed,
+      completed: false,
       userId: USER_ID,
     })
       .then(() => {
         reset();
         setJustAdded(true);
       })
-      .catch(error => {
-        setErrorMessege('Unable to add a todo');
+      .catch(() => {
+        setErrorMessege(MessageError.add);
         setJustAdded(true);
-
-        console.error(error);
       })
       .finally(() => {
         setIsSubmiting(false);
@@ -89,15 +82,19 @@ export const TodoHeader: React.FC<Props> = ({
   return (
     <header className="todoapp__header">
       {/* this button should have `active` class only if all todos are completed */}
-      <button
-        type="button"
-        // className="todoapp__toggle-all active"
-        onClick={toggleAll}
-        className={cn('todoapp__toggle-all', {
-          active: todos.every(todo => todo.completed),
-        })}
-        data-cy="ToggleAllButton"
-      />
+
+      {!!todos.length && (
+        <button
+          type="button"
+          onClick={() => {
+            toggleAll();
+          }}
+          className={cn('todoapp__toggle-all', {
+            active: todos.every(t => t.completed),
+          })}
+          data-cy="ToggleAllButton"
+        />
+      )}
       {/* Add a todo on form submit */}
       <form onSubmit={handleSubmit} onReset={reset}>
         <input

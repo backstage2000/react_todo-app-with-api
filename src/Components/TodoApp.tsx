@@ -86,7 +86,7 @@ export const TodoApp: React.FC = () => {
     return todoService
       .deleteTodos(id)
       .then(() => {
-        setTodos(todos.filter(todo => todo.id !== id));
+        setTodos(preventTodos => preventTodos.filter(todo => todo.id !== id));
 
         focusInput.current?.();
       })
